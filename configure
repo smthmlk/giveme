@@ -65,15 +65,27 @@ else
 fi
 rm -f $CONFTEST
 
+echo -n "checking which os.. "
+# setup CFLAGS var
+CFLAGS="-Wall -O2 -c"
 
-
-
+# are we in an OSX environment?
+if [[ `uname` == "Darwin" ]]; then
+    CFLAGS="$CFLAGS -D__OSX__"
+    echo "osx"
+elif [[ `uname` == "Linux" ]]; then
+    echo "linux"
+else
+    echo "unknown"
+fi
 
 echo -n "Building Makefile " 
 
 if [[ -r Makefile ]]; then rm -f Makefile ; fi
 echo -e "RM = /bin/rm -f\nPROG = giveme\nCONFIG = configure.sh\nINSTALL = /usr/bin/install" > $DEST
-echo -e "SRC=src\nCFLAGS=-Wall -O2 -c\nOBJS := \$(patsubst %.c,%.o,\$(wildcard \$(SRC)/*.c))" >> $DEST
+echo -e "SRC=src\n" >> $DEST
+echo -e "CFLAGS=$CFLAGS\n" >> $DEST
+echo -e "OBJS := \$(patsubst %.c,%.o,\$(wildcard \$(SRC)/*.c))" >> $DEST
 echo -n .
 
 echo -e "\ndefault: giveme\n" >> $DEST
