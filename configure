@@ -1,0 +1,310 @@
+#!/bin/bash
+CC=gcc
+BINDIR=/usr/bin
+DEST=Makefile
+WAVHANDLER="wavDec.sh"
+CONFTEST="conftest.c"
+
+if [[ ! $CFLAGS ]]; then
+	CFLAGS="-Wall -O2 -c"
+fi
+
+echo -e "CFLAGS to be used: $CFLAGS"
+
+echo -en "Checking for gcc... "
+$CC -v 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	gcc_exec=`whereis gcc | awk '{print $2}'`
+	echo -e "${gcc_exec}"
+else 
+	echo "none found. please install gcc."
+	exit 1
+fi
+
+
+
+echo -en "gcc+CFLAGS sanity check... "
+rm -f $CONFTEST
+echo -e "#include <stdio.h>\nint main() {\n return 0;\n}\n" >> $CONFTEST
+gcc $CFLAGS -o ct $CONFTEST 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	echo "OK"
+	rm -f "ct"
+else
+	echo -e "failed!\n-- Your gcc install is fuckt or your CFLAGS are retardo."
+	exit 1
+fi
+
+
+
+
+echo -en "Checking for pthread.h... "
+rm -f $CONFTEST
+echo -e "#include <stdio.h>\n#include <pthread.h>\nint main() {\n return 0;\n}\n" >> $CONFTEST
+gcc -pthread -o ct $CONFTEST 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	echo "OK"
+	rm -f "ct"
+else
+	echo -e "failed!\n-- pthread.h is missing. Your gcc install is fuckt."
+	exit 1
+fi
+
+
+
+echo -en "Checking for unistd.h... "
+rm -f $CONFTEST
+echo -e "#include <stdio.h>\n#include <unistd.h>\nint main() {\n return 0;\n}\n" >> $CONFTEST
+gcc -o ct $CONFTEST 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	echo "OK"
+	rm -f "ct"
+else
+	echo -e "failed!\n-- unistd.h is missing. Your gcc install is fuckt."
+	exit 1
+fi
+rm -f $CONFTEST
+
+
+
+
+
+echo -n "Building Makefile " 
+
+if [[ -r Makefile ]]; then rm -f Makefile ; fi
+echo -e "RM = /bin/rm -f\nPROG = giveme\nCONFIG = configure.sh\nINSTALL = /usr/bin/install" > $DEST
+echo -e "SRC=src\nCFLAGS=-Wall -O2 -c\nOBJS := \$(patsubst %.c,%.o,\$(wildcard \$(SRC)/*.c))" >> $DEST
+echo -n .
+
+echo -e "\ndefault: giveme\n" >> $DEST
+
+echo -e "" >> $DEST
+echo -e "giveme: \$(OBJS)" >> $DEST
+echo -e "\t\$(CC) -lm -pthread -o \$@ \$?\n" >> $DEST
+echo -e "%.o: %.c" >> $DEST
+echo -e "\t\$(CC) \${CFLAGS} -o \$@ \$<\n" >> $DEST
+
+echo "clean:" >> $DEST
+echo -e "\t\$(RM) giveme *.o \$(SRC)/*.o\n" >> $DEST
+
+echo "mrproper: clean" >> $DEST
+echo -e "\t\$(RM) giveme3.conf Makefile\n" >> $DEST
+
+
+echo "uninstall:" >> $DEST
+echo -e "\t\$(RM) \${BINDIR}/giveme" >> $DEST
+echo -e "\t\$(RM) \${BINDIR}/${WAVHANDLER}" >> $DEST
+
+for i in `ls /home | grep -v lost.found`; do
+	if [[ $i ]]; then
+		echo -e "\t\$(RM) /home/${i}/.giveme3.conf" >> $DEST
+		echo -n .
+	fi
+done
+
+
+
+echo -e "\ninstall:" >> $DEST
+echo -e "\t\$(INSTALL) giveme ${BINDIR}/giveme" >> $DEST
+echo -e "\t\$(INSTALL) ${WAVHANDLER} ${BINDIR}/${WAVHANDLER}" >> $DEST
+
+for i in `ls /home | grep -v lost.found`; do
+	if [[ $i ]]; then
+		echo -e "\t\$(INSTALL) -o ${i} -m 644 giveme3.conf /home/${i}/.giveme3.conf" >> $DEST
+		echo -n .
+	fi
+done
+
+
+echo -e ". OK"
+
+
+
+
+echo -e "Building giveme3.conf..."
+CONFFILE=giveme3.conf
+TOOLCOUNT=0
+if [[ -r $CONFFILE ]]; then rm -f $CONFFILE ; fi
+
+
+
+# wav handler haha
+echo -e "wav,${BINDIR}/${WAVHANDLER},0 encode INFILE OUTFILE,${BINDIR}/${WAVHANDLER},0 decode INFILE OUTFILE" >> $CONFFILE
+((TOOLCOUNT++))
+
+
+
+
+
+# MP3,MP2 / Lame
+echo -en "Checking for lame (mp3/mp2)... "
+lame --version 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	lame_exec=`whereis lame | awk '{print $2}'`
+	echo -e "$lame_exec"
+	echo -e "mp3,${lame_exec},lame -V0 --vbr-new --quiet INFILE OUTFILE,${lame_exec},lame --quiet --decode INFILE OUTFILE" >> $CONFFILE
+	echo -e "mp2,/bin/echo,echo "cant encode to mp2." INFILE OUTFILE,${lame_exec},lame --quiet --decode INFILE OUTFILE" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	lame_exec=
+	echo NOT FOUND
+fi
+
+
+
+
+
+# OGG
+echo -en "Checking for oggdec... "
+oggdec --version 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	oggdec_exec=`whereis oggdec | awk '{print $2}'`
+	echo -e "$oggdec_exec"
+else
+	oggdec_exec=
+	echo NOT FOUND
+fi
+
+echo -en "Checking for oggenc... "
+oggenc --version 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	oggenc_exec=`whereis oggenc | awk '{print $2}'`
+	echo -e "$oggenc_exec"
+	echo -e "ogg,${oggenc_exec},oggenc -q 6 --quiet -o OUTFILE INFILE,${oggdec_exec},oggdec --quiet -o OUTFILE INFILE" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	oggenc_exec=
+	echo NOT FOUND
+fi
+
+
+
+
+
+
+
+
+# FLAC
+echo -en "Checking for flac... "
+flac --version 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	flac_exec=`whereis flac | awk '{print $2}'`
+	echo -e "$flac_exec"
+	echo -e "flac,${flac_exec},flac -V -8 --silent -o OUTFILE INFILE,${flac_exec},flac --decode -s -o OUTFILE INFILE" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	flac_exec=
+	echo NOT FOUND
+fi
+
+
+
+
+# m4a -> AAC
+echo -en "Checking for faad (m4a,aac)... "
+faad -v 1> /dev/null 2>&1
+if [[ $? == 1 ]]; then
+	faad_exec=`whereis faad | awk '{print $2}'`
+	faad_args="faad -o OUTFILE INFILE"
+	echo -e "$faad_exec"
+else
+	faad_exec="echo"
+	faad_args="faad is not installed or configure couldn't find it. No decoding of m4a."
+	echo NOT FOUND
+fi
+
+echo -en "Checking for faac (aac)... "
+faac -v 1> /dev/null 2>&1
+if [[ $? == 1 ]]; then
+	faac_exec=`whereis faac | awk '{print $2}'`
+	echo -e "$faac_exec"
+	echo -e "m4a,${faac_exec},faac -q 350 -c 44100 -o OUTFILE INFILE,${faad_exec},${faad_args}" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	faac_exec=
+	echo NOT FOUND
+fi
+
+
+
+
+# APE / MAC
+echo -en "Checking for mac (ape)... "
+mac -v 1> /dev/null 2>&1
+if [[ $? == 255 ]]; then
+	mac_exec=`whereis mac | awk '{print $2}'`
+	echo -e "$mac_exec"
+	echo -e "ape,${mac_exec},mac INFILE OUTFILE -c3000,${mac_exec},mac INFILE OUTFILE -d" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	mac_exec=
+	echo NOT FOUND
+fi
+
+
+
+
+
+# WAVPACK
+echo -en "Checking for wvunpack (wv)... "
+wvunpack -v 1> /dev/null 2>&1
+if [[ $? == 1 ]]; then
+	wvunpack_exec=`whereis wvunpack | awk '{print $2}'`
+	echo -e "$wvunpack_exec"
+else
+	wavpack_exec=
+	echo NOT FOUND
+fi
+
+echo -en "Checking for wavpack (wv)... "
+wavpack -v 1> /dev/null 2>&1
+if [[ $? == 1 ]]; then
+	wavpack_exec=`whereis wavpack | awk '{print $2}'`
+	echo -e "$wavpack_exec"
+	echo -e "wv,${wavpack_exec},wavpack -qh -o OUTFILE INFILE,${wvunpack_exec},wvunpack -q -o OUTFILE INFILE" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	wavpack_exec=
+	echo NOT FOUND
+fi
+
+
+
+# FFMPEG -> WMA
+echo -en "Checking for ffmpeg (wma)... "
+ffmpeg -h 1> /dev/null 2>&1
+if [[ $? == 1 ]]; then
+	ffmpeg_exec=`whereis ffmpeg | awk '{print $2}'`
+	echo -e "$ffmpeg_exec"
+	echo -e "wma,${ffmpeg_exec},ffmpeg echo DontUseFFmpegForEncoding,${ffmpeg_exec},ffmpeg -i INFILE OUTFILE" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	ffmpeg_exec=
+	echo NOT FOUND
+fi
+
+
+
+# TTAENC -> TTA (another lossless... ugh)
+echo -en "Checking for ttaenc (tta)... "
+ttaenc -h 1> /dev/null 2>&1
+if [[ $? == 0 ]]; then
+	ttaenc_exec=`whereis ttaenc | awk '{print $2}'`
+	echo -e "$ttaenc_exec"
+	echo -e "tta,${ttaenc_exec},ttaenc -e -o OUTFILE INFILE,${ttaenc_exec},ttaenc -d -o OUTFILE INFILE" >> $CONFFILE
+	((TOOLCOUNT++))
+else
+	ttaenc_exec=
+	echo NOT FOUND
+fi
+
+
+
+# conf file sanity check
+if [[ ! $TOOLCOUNT -gt 1 ]]; then
+	echo -e "\nWARNING! You dont seem to have any audio tools installed!\nInstall some and rerun ./configure.\nDo NOT run giveme!\n\n"
+	exit 1
+else
+	echo -e "\ndone. Run 'make' next.\n"
+	exit 0
+fi
