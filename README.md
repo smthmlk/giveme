@@ -1,7 +1,7 @@
 giveme
 ======
 
-Multi-threaded audio conversion utility with lots of configurability. It lets you use existing audio encoder/decoder builds, and set any parameters you want for each independently. It does not handle tagging as that was a feature I never got around to dealing with.
+Multi-threaded audio conversion utility with lots of configurability, written in C over 2007-2009. It lets you use existing audio encoder/decoder builds, and set any parameters you want for each independently. It does not handle tagging as that was a feature I never got around to dealing with.
 
 The primary problem I solved in writing giveme many years ago was to decrease the time it took to convert a lot of flac files to mp3s: my system had two physical CPU cores, but lame, flac, etc are all single-threaded. I wrote this as an exercise to toy with pthreads and to parallelize the decode/encode process for n audio files.
 
