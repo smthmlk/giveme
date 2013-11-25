@@ -10,9 +10,9 @@ Installation
 Compile:
 
 ```bash
-./configure
-make
-make install (as root)
+$ ./configure
+$ make
+# make install
 ```
 
 You will need ncurses installed, as well as the ncurses-devel or ncurses-dev packages. These were needed for an experimental ncurses-based user interface.
