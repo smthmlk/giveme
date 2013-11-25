@@ -7,7 +7,8 @@ The primary problem I solved in writing giveme many years ago was to decrease th
 
 Installation
 ------------
-Compile:
+
+To compile, follow the usual build pattern:
 
 ```bash
 $ ./configure
@@ -15,7 +16,7 @@ $ make
 $ sudo make install
 ```
 
-You will need ncurses installed, as well as the ncurses-devel or ncurses-dev packages. These were needed for an experimental ncurses-based user interface.
+giveme is known to compile on most any linux distribution and MacOSX.
 
 Features
 --------
