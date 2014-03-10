@@ -129,9 +129,12 @@ TOOL *buildTool(char **rawStrings) {
 
     // elements 2 and 4 are no longer needed, so we can free them now
     free(rawStrings[2]);
-    free(rawStrings[4]);
     rawStrings[2] = NULL;
+    free(rawStrings[4]);
     rawStrings[4] = NULL;
+    // this last element is our extra terminal element. it must be freed as well, otherwise we lose 1 byte per tool created
+    free(rawStrings[5]);
+    rawStrings[5] = NULL;
 
     //printf("buildTool(): created tool %s successfully\n", rawStrings[0]);
 	return newTool;
@@ -174,39 +177,6 @@ TOOL *destroyTool(TOOL *tool) {
 	return NULL;
 }
 
-/*
-char **parseEncDecString(char *raw, int *DarySize) {
-	int  j, arySize;
-	char *temp;
-	char *temp2;
-	char **ary;
-	char **tmp;
-
-
-	arySize = 3;
-	ary = (char **) calloc(arySize, sizeof(char *));
-	temp2 = raw;
-
-	for(j=1; (temp = strtok(temp2, " ")) != NULL; j++,temp2=NULL) {
-	//for(j=1; (temp = strtok(temp2, " ")) != NULL; j++,temp2=NULL) {
-
-		if(j == arySize) { // we need to reallocate mem for this array
-			arySize++;
-			tmp = (char **) realloc(ary, arySize * sizeof(char *)); // lolz
-			tmp[j] = NULL; // i wish realloc would initialize shit :(
-			ary = tmp;
-		}
-
-		ary[j-1] = (char *) calloc(strlen(temp)+1, sizeof(char));
-		strcpy(ary[j-1], temp);
-	}
-
-	*DarySize = j-1;
-	return ary;
-} */
-
-
-
 
 char **tokenizeString(char *orig, char delim, int *size) {
 	char **ary;
@@ -216,13 +186,10 @@ char **tokenizeString(char *orig, char delim, int *size) {
 	numTokens = 0;
     if(orig == NULL) {
         printf("tokenizeString(): orig is null\n");
-        ary = (char **) calloc(0, sizeof(char *));
+        ary = (char **) calloc(1, sizeof(char *));
         *size = 0;
         return ary;
     }
-    //printf("tokensizeString(): orig is not null\n");
-    //printf("tokensizeString(): '%x'\n", orig);
-    //printf("tokensizeString(): len(orig)=%d\n", strnlen(orig, 128));
 
 	// first, count number of tokens needed, separated by delimiters
 	for(i=0; orig[i] != '\0' && orig[i] != '\n'; i++) {
@@ -230,18 +197,20 @@ char **tokenizeString(char *orig, char delim, int *size) {
             numTokens++;
 	}
 
+    // we have a count of the number of separators, but to get the number of tokens, we need 1 more
+    // lastly, we need yet another to hold the null byte. So we will increment this by 1 right now to
+    // get the correct size, and add another later during allocation
 	numTokens++;
-	//printf("tokenizeString(): number tokens: %d delim='%c' orig=\"%s\"\n", numTokens, delim, orig);
 
 	// if we were given an int to fill, fill it.
 	if(size)
 		*size = numTokens;
 
-	// create an ary of the right size.
-	ary = (char **) calloc(numTokens +1, sizeof(char *));
+	// create an ary of the right size (adding another to the numTokens to account for array term)
+	ary = (char **) calloc(numTokens + 1, sizeof(char *));
 
 	// create a buffer
-	buffer = (char *) calloc(100, sizeof(char));
+	buffer = (char *) calloc(512, sizeof(char));
 
 	// now, traverse the string again and pull out tokens & allocate
 	count = 0;
@@ -252,11 +221,12 @@ char **tokenizeString(char *orig, char delim, int *size) {
 		}
  		// we have the end of a token. j is the length of the token.
 		else {
-            //printf("allocating new token in ary, i=%d, j=%d\n", i, j);
             buffer[j] = '\0';
             ary[count] = (char *) calloc(j+1, sizeof(char));
-            strcpy(ary[count], buffer);
+            strncpy(ary[count], buffer, j);
+            ary[count][j] = '\0';
 
+            // clear the buffer for the next go-round
             for(k=0; k <= j+1; k++)
                 buffer[k]='*';
 
