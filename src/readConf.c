@@ -27,7 +27,7 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 	//char *strtoksux;
 	char **rawStrings = NULL;
 	TOOL **toolAry = NULL;
-	
+
 	if ( (fp = fopen(txtfile, "r")) == NULL) {
 		printf(">> Error opening file \'%s.\' Exiting.\n\n", txtfile);
 		*status = -1;
@@ -43,28 +43,25 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 
 			size=-1;
 			rawStrings = NULL;
-			rawStrings = tokenizeString(buffer, ',', &size);	
+			rawStrings = tokenizeString(buffer, ',', &size);
 
 			if(rawStrings == NULL)
 				printf("readConf(): rawStrings is null. segfault!  size=%d, buffer='%s'\n",size,buffer);
 			else if(job->verbose) {
 				printf("readConf(): rawStrings is not null, whew. size=%d, buffer='%s'\n",size,buffer);
 				printf("            contents:\n");
-				//for(i=0; i < size; printf("             > [%d] \"%s\"\n", i, rawStrings[i++]));
+				for(i=0; i < size; printf("             > [%d] \"%s\"\n", i, rawStrings[i++]));
 			}
 
-			/*strtoksux = buffer;
-			for(i=0; (temp = strtok(strtoksux, ",\n")) != NULL && i < 5; i++, strtoksux=NULL) {
-				len = strlen(temp) + 1;
-				rawStrings[i] = (char *) calloc(len, sizeof(char));
-				strncpy(rawStrings[i], temp, len);
-			}*/
-
 			toolAry[j] = buildTool(rawStrings);
-		
+
+            printf("freeing rawStrings array\n");
+            if(size >= 2)
 			free(rawStrings[2]);
-			free(rawStrings[4]);
+            if(size >= 4)
+                free(rawStrings[4]);
 			free(rawStrings);
+            printf("freed rawStrings\n");
 		}
 
 
@@ -80,16 +77,16 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 			printf("\t  encPath=%s\n", toolAry[i]->encPath);
 			printf("\t  decPath=%s\n", toolAry[i]->decPath);
 			printf("\t  encAry(%d): ", toolAry[i]->encArySize);
-		
+
 			for(j=0; toolAry[i]->encAry[j] != NULL; j++)
-				printf("[%d]=\"%s\" ", j, toolAry[i]->encAry[j]);	
+				printf("[%d]=\"%s\" ", j, toolAry[i]->encAry[j]);
 
 			printf("\n\t  decAry(%d): ", toolAry[i]->decArySize);
 			for(j=0; toolAry[i]->decAry[j] != NULL; j++)
 				printf("[%d]=\"%s\" ", j, toolAry[i]->decAry[j]);
 
 			printf("\n\n");
-		} 
+		}
 
 		//free(rawStrings);
 		free(buffer);
@@ -105,13 +102,13 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 
 
 char *buildExtensionsRegExp(TOOL **tools) {
-	char *regexpStr;	
+	char *regexpStr;
 	int i, total;
 
 	// traverse list, count number of chars needed.
 	for(i=0, total=0; tools[i] != NULL; total += strlen(tools[i]->name) + 4, i++);
 	//printf("buildExtensionRegExp(): string will be %d chars long.\n", total);
-	
+
 	regexpStr = (char *) calloc(total+1,sizeof(char));
 
 
@@ -123,7 +120,7 @@ char *buildExtensionsRegExp(TOOL **tools) {
 		if(tools[i+1] != NULL)
 			strcat(regexpStr, "|");
 	}
-	
+
 	//printf("buildExtensionRegExp(): regexpStr=\"%s\", %d chars long.\n", regexpStr, (int) strlen(regexpStr));
 	return regexpStr;
 }
@@ -131,8 +128,9 @@ char *buildExtensionsRegExp(TOOL **tools) {
 
 TOOL *buildTool(char **rawStrings) {
 	TOOL *newTool;
-
 	newTool = (TOOL *) calloc(1, sizeof(TOOL));
+    printf("buildTool(): rawStrings=%x\n", rawStrings);
+    printf("buildTool(): building tool, name=%s: \n", rawStrings[0]);
 
 	newTool->name = rawStrings[0];
 	newTool->encPath = rawStrings[1];
@@ -140,6 +138,7 @@ TOOL *buildTool(char **rawStrings) {
 	newTool->encAry = tokenizeString(rawStrings[2], ' ', &newTool->encArySize);
 	newTool->decAry = tokenizeString(rawStrings[4], ' ', &newTool->decArySize);
 
+    printf("buildTool(): created tool %s successfully\n", rawStrings[0]);
 	return newTool;
 }
 
@@ -154,7 +153,7 @@ TOOL **destroyAllTools(TOOL **toolAry) {
 
 		free(toolAry);
 	}
-	
+
 	return NULL;
 }
 
@@ -168,15 +167,15 @@ TOOL *destroyTool(TOOL *tool) {
 	free(tool->decPath);
 
 	for(i=0; tool->encAry[i] != NULL; i++)
-		free(tool->encAry[i]); 
+		free(tool->encAry[i]);
 
 	for(i=0; tool->decAry[i] != NULL; i++)
-		free(tool->decAry[i]); 
+		free(tool->decAry[i]);
 
 	free(tool->encAry);
 	free(tool->decAry);
 	free(tool);
-	
+
 	return NULL;
 }
 
@@ -190,10 +189,10 @@ char **parseEncDecString(char *raw, int *DarySize) {
 
 
 	arySize = 3;
-	ary = (char **) calloc(arySize, sizeof(char *)); 
+	ary = (char **) calloc(arySize, sizeof(char *));
 	temp2 = raw;
 
-	for(j=1; (temp = strtok(temp2, " ")) != NULL; j++,temp2=NULL) {	
+	for(j=1; (temp = strtok(temp2, " ")) != NULL; j++,temp2=NULL) {
 	//for(j=1; (temp = strtok(temp2, " ")) != NULL; j++,temp2=NULL) {
 
 		if(j == arySize) { // we need to reallocate mem for this array
@@ -219,9 +218,15 @@ char **tokenizeString(char *orig, char delim, int *size) {
 	char *buffer;
 	int i, j, k, count, numTokens;
 	bool newSpace = true;
-	
+
 	numTokens = 0;
-	
+    if(orig == NULL) {
+        printf("tokenizeString(): orig is null\n");
+        ary = (char **) calloc(0, sizeof(char *));
+        *size = 0;
+        return ary;
+    }
+
 	// first, count number of tokens needed, separated by spaces.
 	for(i=0; orig[i] != '\0' && orig[i] != '\n'; i++) {
 		//printf("orig[%d]=%c", i, orig[i]);
@@ -234,30 +239,30 @@ char **tokenizeString(char *orig, char delim, int *size) {
 		}
 		else {
 			newSpace = true;
-			//printf("\n");	
+			//printf("\n");
 		}
-	}	
-	
+	}
+
 	numTokens++;
-	//printf("number tokens: %d\n", numTokens);
-	
+	printf("tokenizeString(): number tokens: %d delim='%c' orig=\"%s\"\n", numTokens, delim, orig);
+
 	// if we were given an int to fill, fill it.
 	if(size)
 		*size = numTokens;
-	
+
 	// create an ary of the right size.
 	ary = (char **) calloc(numTokens +1, sizeof(char *));
-		
+
 	// create a buffer
 	buffer = (char *) calloc(100, sizeof(char));
-	
+
 	// now, traverse the string again and pull out tokens & allocate
 	newSpace = true;
 	count = 0;
 	for(i=0, j=0; i <= strlen(orig) ; i++) {
 		if( orig[i] != delim && orig[i] != '\n' && orig[i] != '\0') {
 			buffer[j] = orig[i];
-			newSpace=true;	
+			newSpace=true;
 			j++;
 		}
  		// we have the end of a token. j is the length of the token.
@@ -268,10 +273,10 @@ char **tokenizeString(char *orig, char delim, int *size) {
 				buffer[j] = '\0';
 				ary[count] = (char *) calloc(j+1, sizeof(char));
 				strcpy(ary[count], buffer);
-			
+
 				for(k=0; k <= j+1; k++)
 					buffer[k]='*';
-			
+
 
 				//printf("ary[%d] has token: '%s'\n", count, ary[count]);
 				j=0;
@@ -279,8 +284,7 @@ char **tokenizeString(char *orig, char delim, int *size) {
 			}
 		}
 	}
-	
-	
+
 	free(buffer);
-	return ary;	
+	return ary;
 }

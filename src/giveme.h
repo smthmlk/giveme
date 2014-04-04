@@ -31,7 +31,12 @@
 #include <errno.h>
 #include <regex.h>
 #include <math.h>
+
+#ifdef __OSX__
+#include <sys/wait.h>
+#else
 #include <wait.h>
+#endif
 
 #define TMPDIR "/tmp/"
 #define MAX 200
