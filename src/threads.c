@@ -25,27 +25,27 @@ int main(int argc, char **argv)
 	int res = 0;
 
 	// read the arguments given, build a job.
-	job1 = createJob(argc, argv);  
+	job1 = createJob(argc, argv);
 
 	// parse our available tools.
 	conffile = getConfPath("/.giveme3.conf");
-	tools = readConf(conffile, &res, job1); 
+	tools = readConf(conffile, &res, job1);
 	free(conffile);
 
-	if(res != 0) 
+	if(res != 0)
 		printf(">> Are you running as root?\n");
 	else {
 		// do we even have an encoder for the desired format?
 		if( haveAppropriateTool(job1->destFormat, tools) )
 			// if so, do the job.
-			threadManager(tools, job1); 
+			threadManager(tools, job1);
 		else
 			printf("\n\n>> No encoder found to create '%s' files.\n   Try another format, or install an appropriate encoder.\n\n", job1->destFormat);
 	}
 
 	// clean up
 	job1 = destroyJob(job1);
-	tools = destroyAllTools(tools); 
+	tools = destroyAllTools(tools);
 	return 0;
 }
 
@@ -85,7 +85,7 @@ void threadManager(TOOL **tools, JOB *job) {
 
 	// just for my own sanity
 	if(job->verbose) {
-		printf("\n\nlist has %d nodes....\n", list->count); 
+		printf("\n\nlist has %d nodes....\n", list->count);
 		LL_traverseList(list, printMyData);
 		printf("\n\n");
 	}
@@ -93,7 +93,7 @@ void threadManager(TOOL **tools, JOB *job) {
 	// for freeing later, use arrays for packages and threads to keep track of what we create
 	PACKAGE2 **pkgAry = (PACKAGE2 **) calloc(list->count, sizeof(PACKAGE2 *));
 	pthread_t **pthAry = (pthread_t **) calloc(list->count, sizeof(pthread_t *));
-	
+
 
 	// LOOP TIME
 	completedFiles = 0;
@@ -103,7 +103,7 @@ void threadManager(TOOL **tools, JOB *job) {
 	int busyThreadsCopy = 0;
 
 	// the non-verbose output is a simple progress indicator
-	if(! job->verbose) { 
+	if(! job->verbose) {
 		printf("giveme %s.\n", VERSIONINFO);
 		printf("Progress: %3.0f%%", 0.0); fflush(stdout); }
 
@@ -120,11 +120,11 @@ void threadManager(TOOL **tools, JOB *job) {
 			pkgAry[i]->fn  = (FILENAME *) currentNode->dataPtr;
 			pkgAry[i]->bth = &busyThreads;
 			pkgAry[i]->mut = mymutex;
-	
+
 			// increment busyThreads
 			pthread_mutex_lock(mymutex);
 			busyThreads++;
-			pthread_mutex_unlock(mymutex);			
+			pthread_mutex_unlock(mymutex);
 
 			// launch
 			pthAry[i] = (pthread_t *) calloc(1, sizeof(pthread_t));
@@ -189,6 +189,8 @@ void *encode(PACKAGE2 *pkg) {
 	cpid = fork();
 	if(cpid==0) {
 		execv(fn->encExe, fn->encA);
+        if(errno != 0)
+            printf("[%d] An error occurred while encoding the file: errno=%d\n", pkg->tid, errno);
 	}
 	else {
 		waitpid(cpid, &status, 0);
@@ -197,7 +199,7 @@ void *encode(PACKAGE2 *pkg) {
 		//if(fn->deleteWav) // we always delete wav files now because we always copy to /tmp
 			if(! deleteTempWav(fn))
 				printf("-- [%d] couldn't delete temp wav file, '%s'.\n", pkg->tid, fn->wavName);
-	}			
+	}
 
 	if(pkg->job->verbose) printf("\n");
 
@@ -222,6 +224,8 @@ void *decode(PACKAGE2 *pkg) {
 	cpid = fork();
 	if(cpid==0) {
 		execv(fn->decExe, fn->decA);
+        if(errno != 0)
+            printf("[%d] An error occurred while decoding file: errno=%d\n", pkg->tid, errno);
 	}
 	else {
 		waitpid(cpid, &status, 0);

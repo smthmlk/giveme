@@ -5,6 +5,20 @@ DEST=Makefile
 WAVHANDLER="wavDec.sh"
 CONFTEST="conftest.c"
 
+
+getExePath() {
+    # $1 is the executable name you want to find the path for
+    exe_path=`which $1`
+    if [[ $exe_path == '' ]]; then
+        exe_path=`whereis $exe_path | awk '{print $1}'`
+        if [[ $exe_path == '' ]]; then
+            echo "failed to find path for $1 despite being able to run it! Check which/whereis behavior"
+            exit 1
+        fi
+    fi
+    echo $exe_path
+}
+
 if [[ ! $CFLAGS ]]; then
 	CFLAGS="-Wall -O2 -c"
 fi
@@ -133,7 +147,7 @@ echo -e ". OK"
 
 
 
-echo -e "Building giveme3.conf..."
+echo -e "Building configuration file (giveme3.conf)..."
 CONFFILE=giveme3.conf
 TOOLCOUNT=0
 if [[ -r $CONFFILE ]]; then rm -f $CONFFILE ; fi
@@ -152,7 +166,7 @@ echo -e "wav,${BINDIR}/${WAVHANDLER},0 encode INFILE OUTFILE,${BINDIR}/${WAVHAND
 echo -en "Checking for lame (mp3/mp2)... "
 lame --version 1> /dev/null 2>&1
 if [[ $? == 0 ]]; then
-	lame_exec=`whereis lame | awk '{print $2}'`
+    lame_exec=`getExePath lame`
 	echo -e "$lame_exec"
 	echo -e "mp3,${lame_exec},lame -V0 --vbr-new --quiet INFILE OUTFILE,${lame_exec},lame --quiet --decode INFILE OUTFILE" >> $CONFFILE
 	echo -e "mp2,/bin/echo,echo "cant encode to mp2." INFILE OUTFILE,${lame_exec},lame --quiet --decode INFILE OUTFILE" >> $CONFFILE
@@ -170,7 +184,7 @@ fi
 echo -en "Checking for oggdec... "
 oggdec --version 1> /dev/null 2>&1
 if [[ $? == 0 ]]; then
-	oggdec_exec=`whereis oggdec | awk '{print $2}'`
+    oggdec_exec=`getExePath oggdec`
 	echo -e "$oggdec_exec"
 else
 	oggdec_exec=
@@ -180,7 +194,7 @@ fi
 echo -en "Checking for oggenc... "
 oggenc --version 1> /dev/null 2>&1
 if [[ $? == 0 ]]; then
-	oggenc_exec=`whereis oggenc | awk '{print $2}'`
+    oggenc_exec=`getExePath oggenc`
 	echo -e "$oggenc_exec"
 	echo -e "ogg,${oggenc_exec},oggenc -q 6 --quiet -o OUTFILE INFILE,${oggdec_exec},oggdec --quiet -o OUTFILE INFILE" >> $CONFFILE
 	((TOOLCOUNT++))
@@ -200,7 +214,7 @@ fi
 echo -en "Checking for flac... "
 flac --version 1> /dev/null 2>&1
 if [[ $? == 0 ]]; then
-	flac_exec=`whereis flac | awk '{print $2}'`
+    flac_exec=`getExePath flac`
 	echo -e "$flac_exec"
 	echo -e "flac,${flac_exec},flac -V -8 --silent -o OUTFILE INFILE,${flac_exec},flac --decode -s -o OUTFILE INFILE" >> $CONFFILE
 	((TOOLCOUNT++))
@@ -216,7 +230,7 @@ fi
 echo -en "Checking for faad (m4a,aac)... "
 faad -v 1> /dev/null 2>&1
 if [[ $? == 1 ]]; then
-	faad_exec=`whereis faad | awk '{print $2}'`
+    faad_exec=`getExePath $1`
 	faad_args="faad -o OUTFILE INFILE"
 	echo -e "$faad_exec"
 else
@@ -228,7 +242,7 @@ fi
 echo -en "Checking for faac (aac)... "
 faac -v 1> /dev/null 2>&1
 if [[ $? == 1 ]]; then
-	faac_exec=`whereis faac | awk '{print $2}'`
+    faac_exec=`getExePath faac`
 	echo -e "$faac_exec"
 	echo -e "m4a,${faac_exec},faac -q 350 -c 44100 -o OUTFILE INFILE,${faad_exec},${faad_args}" >> $CONFFILE
 	((TOOLCOUNT++))
@@ -244,7 +258,7 @@ fi
 echo -en "Checking for mac (ape)... "
 mac -v 1> /dev/null 2>&1
 if [[ $? == 255 ]]; then
-	mac_exec=`whereis mac | awk '{print $2}'`
+    mac_exec=`getExePath mac`
 	echo -e "$mac_exec"
 	echo -e "ape,${mac_exec},mac INFILE OUTFILE -c3000,${mac_exec},mac INFILE OUTFILE -d" >> $CONFFILE
 	((TOOLCOUNT++))
@@ -261,7 +275,7 @@ fi
 echo -en "Checking for wvunpack (wv)... "
 wvunpack -v 1> /dev/null 2>&1
 if [[ $? == 1 ]]; then
-	wvunpack_exec=`whereis wvunpack | awk '{print $2}'`
+    wvunpack_exec=`getExePath wvunpack`
 	echo -e "$wvunpack_exec"
 else
 	wavpack_exec=
@@ -271,7 +285,7 @@ fi
 echo -en "Checking for wavpack (wv)... "
 wavpack -v 1> /dev/null 2>&1
 if [[ $? == 1 ]]; then
-	wavpack_exec=`whereis wavpack | awk '{print $2}'`
+    wavpack_exec=`getExePath wavpack`
 	echo -e "$wavpack_exec"
 	echo -e "wv,${wavpack_exec},wavpack -qh -o OUTFILE INFILE,${wvunpack_exec},wvunpack -q -o OUTFILE INFILE" >> $CONFFILE
 	((TOOLCOUNT++))
@@ -286,7 +300,7 @@ fi
 echo -en "Checking for ffmpeg (wma)... "
 ffmpeg -h 1> /dev/null 2>&1
 if [[ $? == 1 ]]; then
-	ffmpeg_exec=`whereis ffmpeg | awk '{print $2}'`
+    ffmpeg_exec=`getExePath ffmpeg`
 	echo -e "$ffmpeg_exec"
 	echo -e "wma,${ffmpeg_exec},ffmpeg echo DontUseFFmpegForEncoding,${ffmpeg_exec},ffmpeg -i INFILE OUTFILE" >> $CONFFILE
 	((TOOLCOUNT++))
@@ -301,7 +315,7 @@ fi
 echo -en "Checking for ttaenc (tta)... "
 ttaenc -h 1> /dev/null 2>&1
 if [[ $? == 0 ]]; then
-	ttaenc_exec=`whereis ttaenc | awk '{print $2}'`
+    ttaenc_exec=`getExePath ttaenc`
 	echo -e "$ttaenc_exec"
 	echo -e "tta,${ttaenc_exec},ttaenc -e -o OUTFILE INFILE,${ttaenc_exec},ttaenc -d -o OUTFILE INFILE" >> $CONFFILE
 	((TOOLCOUNT++))

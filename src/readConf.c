@@ -43,25 +43,21 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 
 			size=-1;
 			rawStrings = NULL;
+            //printf("readConf(): parsing CSV config line into separate strings\n");
 			rawStrings = tokenizeString(buffer, ',', &size);
 
 			if(rawStrings == NULL)
 				printf("readConf(): rawStrings is null. segfault!  size=%d, buffer='%s'\n",size,buffer);
 			else if(job->verbose) {
 				printf("readConf(): rawStrings is not null, whew. size=%d, buffer='%s'\n",size,buffer);
-				printf("            contents:\n");
-				for(i=0; i < size; printf("             > [%d] \"%s\"\n", i, rawStrings[i++]));
+				//printf("            contents:\n");
+				//for(i=0; i < size; printf("             > [%d] \"%s\"\n", i, rawStrings[i++]));
 			}
 
 			toolAry[j] = buildTool(rawStrings);
-
-            printf("freeing rawStrings array\n");
-            if(size >= 2)
 			free(rawStrings[2]);
-            if(size >= 4)
-                free(rawStrings[4]);
+            free(rawStrings[4]);
 			free(rawStrings);
-            printf("freed rawStrings\n");
 		}
 
 
@@ -129,16 +125,18 @@ char *buildExtensionsRegExp(TOOL **tools) {
 TOOL *buildTool(char **rawStrings) {
 	TOOL *newTool;
 	newTool = (TOOL *) calloc(1, sizeof(TOOL));
-    printf("buildTool(): rawStrings=%x\n", rawStrings);
-    printf("buildTool(): building tool, name=%s: \n", rawStrings[0]);
+    //printf("buildTool(): rawStrings=%x\n", rawStrings);
+    //printf("buildTool(): building tool, name=%s: \n", rawStrings[0]);
 
 	newTool->name = rawStrings[0];
 	newTool->encPath = rawStrings[1];
 	newTool->decPath = rawStrings[3];
+    //printf("buildTool(): tokenizing encode string to array\n");
 	newTool->encAry = tokenizeString(rawStrings[2], ' ', &newTool->encArySize);
+    //printf("buildTool(): tokenizing decode string to array\n");
 	newTool->decAry = tokenizeString(rawStrings[4], ' ', &newTool->decArySize);
 
-    printf("buildTool(): created tool %s successfully\n", rawStrings[0]);
+    //printf("buildTool(): created tool %s successfully\n", rawStrings[0]);
 	return newTool;
 }
 
@@ -217,7 +215,6 @@ char **tokenizeString(char *orig, char delim, int *size) {
 	char **ary;
 	char *buffer;
 	int i, j, k, count, numTokens;
-	bool newSpace = true;
 
 	numTokens = 0;
     if(orig == NULL) {
@@ -226,25 +223,18 @@ char **tokenizeString(char *orig, char delim, int *size) {
         *size = 0;
         return ary;
     }
+    //printf("tokensizeString(): orig is not null\n");
+    //printf("tokensizeString(): '%x'\n", orig);
+    //printf("tokensizeString(): len(orig)=%d\n", strnlen(orig, 128));
 
-	// first, count number of tokens needed, separated by spaces.
+	// first, count number of tokens needed, separated by delimiters
 	for(i=0; orig[i] != '\0' && orig[i] != '\n'; i++) {
-		//printf("orig[%d]=%c", i, orig[i]);
-		if(orig[i] == delim) {
-			if(newSpace) {
-				numTokens++;
-				newSpace = false;
-			}
-			//printf(" <a space!>\n");
-		}
-		else {
-			newSpace = true;
-			//printf("\n");
-		}
+		if(orig[i] == delim)
+            numTokens++;
 	}
 
 	numTokens++;
-	printf("tokenizeString(): number tokens: %d delim='%c' orig=\"%s\"\n", numTokens, delim, orig);
+	//printf("tokenizeString(): number tokens: %d delim='%c' orig=\"%s\"\n", numTokens, delim, orig);
 
 	// if we were given an int to fill, fill it.
 	if(size)
@@ -257,31 +247,25 @@ char **tokenizeString(char *orig, char delim, int *size) {
 	buffer = (char *) calloc(100, sizeof(char));
 
 	// now, traverse the string again and pull out tokens & allocate
-	newSpace = true;
 	count = 0;
 	for(i=0, j=0; i <= strlen(orig) ; i++) {
 		if( orig[i] != delim && orig[i] != '\n' && orig[i] != '\0') {
 			buffer[j] = orig[i];
-			newSpace=true;
 			j++;
 		}
  		// we have the end of a token. j is the length of the token.
 		else {
-			if(newSpace) {
-				newSpace = false;
-				//printf("allocating new token in ary, i=%d, j=%d\n", i, j);
-				buffer[j] = '\0';
-				ary[count] = (char *) calloc(j+1, sizeof(char));
-				strcpy(ary[count], buffer);
+            //printf("allocating new token in ary, i=%d, j=%d\n", i, j);
+            buffer[j] = '\0';
+            ary[count] = (char *) calloc(j+1, sizeof(char));
+            strcpy(ary[count], buffer);
 
-				for(k=0; k <= j+1; k++)
-					buffer[k]='*';
+            for(k=0; k <= j+1; k++)
+                buffer[k]='*';
 
-
-				//printf("ary[%d] has token: '%s'\n", count, ary[count]);
-				j=0;
-				count++;
-			}
+            //printf("ary[%d] has token: '%s'\n", count, ary[count]);
+            j=0;
+            count++;
 		}
 	}
 

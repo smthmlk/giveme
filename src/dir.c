@@ -21,7 +21,7 @@ LL_HEADER *ls(char *pathname, TOOL **tools, JOB *job) {
 	DIR *dp;
 	struct dirent *de;
 	bool done = false;
-	
+
 	LL_HEADER *list = (LL_HEADER *) calloc(1,sizeof(LL_HEADER));
 	list->printData = printMyData;
 	list->freeInternals = trashData;
@@ -69,12 +69,12 @@ FILENAME *buildFilename(char *n, TOOL **tools, JOB *job) {
 
 	fn->decA = NULL;
 	fn->encA = NULL;
-	
+
 	len = strlen(n);
 
 	fn->name = (char *) calloc(len+1, sizeof(char));
 	strncpy(fn->name, n, len);
-	
+
 
 	// lolz, i cant get enough of this hack. there she blows again!
 	//int res = regcomp(x, "\\.[tmMoOfFaAw][t4pPgGlLaAvm][p23gGaAcCeEv]*$", 0);
@@ -83,13 +83,13 @@ FILENAME *buildFilename(char *n, TOOL **tools, JOB *job) {
 	int res = regexec(job->extensions_regexp, n, nmatch, r, 0);
 
 	if(res == 0) {
-		if(job->verbose) { printf("\"%s\" matches! so=%d.\n", fn->name, r[0].rm_so); }
+		if(job->verbose) { printf("\"%s\" matches! so=%d.\n", fn->name, (int) r[0].rm_so); }
 
 		// both of the following are done by toLower() now [allocation & copying]
-		//fn->ext = (char *) calloc(6, sizeof(char)); 
+		//fn->ext = (char *) calloc(6, sizeof(char));
 		//strcpy(fn->ext, fn->name + r[0].rm_so +1);
 		fn->ext = toLower(fn->name +r[0].rm_so + 1);
-		
+
 		if(haveAppropriateTool(fn->ext, tools) && strncmp(fn->ext,job->destFormat,6) != 0) {
 			// append TMPDIR string to the beginning of the wavName
 			char *wavNameTmp = (char *) calloc(strnlen(fn->name, MAX)+strnlen(TMPDIR, MAX)+3, sizeof(char));
@@ -97,8 +97,8 @@ FILENAME *buildFilename(char *n, TOOL **tools, JOB *job) {
 			strcat(wavNameTmp, fn->name);
 			fn->wavName = ghettoSubstitute(wavNameTmp, fn->ext, "wav");
 			free(wavNameTmp);
-			
-			fn->outName = ghettoSubstitute(fn->name, fn->ext, job->destFormat);	
+
+			fn->outName = ghettoSubstitute(fn->name, fn->ext, job->destFormat);
 
 			fn->decA = determineCoder(fn->ext, tools, 1, &fn->decExe, job);
 			fn->encA = determineCoder(job->destFormat, tools, 0, &fn->encExe, job);
@@ -111,7 +111,7 @@ FILENAME *buildFilename(char *n, TOOL **tools, JOB *job) {
 				fn->processMe=true;
 
 			// concat the destination dir & outName.
-			fn->outName = createOutName(fn->outName, job->outPath);	
+			fn->outName = createOutName(fn->outName, job->outPath);
 
 			replaceElement(fn->decA, "INFILE", fn->name);
 			replaceElement(fn->decA, "OUTFILE", fn->wavName);
@@ -139,7 +139,7 @@ FILENAME *buildFilename(char *n, TOOL **tools, JOB *job) {
 bool haveAppropriateTool(char *ext, TOOL **tools) {
 	int i;
 	bool found = false;
-	
+
 	for(i=0; !found && tools[i] != NULL; i++)
 		if(strcasecmp(tools[i]->name, ext) == 0)
 			found = true;
@@ -159,7 +159,7 @@ char *createOutName(char *filename, char *path) {
 	newStr = (char *) calloc(fnLen+pathLen+1, sizeof(char));
 	strcpy(newStr, path);
 	newStr = strcat(newStr, filename);
-	
+
 	free(filename);
 	return newStr;
 }
@@ -175,7 +175,7 @@ bool replaceElement(char **ary, char *target, char *replacement) {
 			ary[i] = (char *) calloc(strlen(replacement)+1, sizeof(char));
 			strcpy(ary[i], replacement);
 			res = true;
-		}		
+		}
 	}
 	return res;
 }
@@ -195,7 +195,7 @@ char **determineCoder(char *ext, TOOL **tools, int type, char **exe, JOB *job) {
 
 		if(strcmp(tools[i]->name, ext) == 0) {
 			found = true;
-			
+
 			// ENC
 			if(type == 0) {
 				*exe = tools[i]->encPath;
@@ -211,11 +211,11 @@ char **determineCoder(char *ext, TOOL **tools, int type, char **exe, JOB *job) {
 			// DEC
 			else {
 				*exe = tools[i]->decPath;
-				srcArySize = tools[i]->decArySize;				
+				srcArySize = tools[i]->decArySize;
 				srcAry = tools[i]->decAry;
 			}
 
-			destAry = (char **) calloc(srcArySize + 2, sizeof(char *)); 
+			destAry = (char **) calloc(srcArySize + 2, sizeof(char *));
 			for(j=0; j < srcArySize ; j++) {
 				destAry[j] = (char *) calloc(strlen(srcAry[j])+1, sizeof(char)); // sigh.
 				strcpy(destAry[j],srcAry[j]); // mega-sigh
@@ -235,7 +235,7 @@ char **determineCoder(char *ext, TOOL **tools, int type, char **exe, JOB *job) {
 char *ghettoSubstitute(char *orig, char *target, char *replacement) {
 	char *newStr;
 	int n, newLen, origLen, targetLen, replacementLen;
-	
+
 	origLen = strlen(orig);
 	targetLen = strlen(target);
 	replacementLen = strlen(replacement);
@@ -255,9 +255,9 @@ bool deleteTempWav(FILENAME *fn) {
 	int res;
 
 	if( (res = unlink(fn->wavName)) == 0)
-		return true;	
+		return true;
 
-	return false;	
+	return false;
 }
 
 
@@ -268,7 +268,7 @@ char *toLower(char *str) {
 
 	len = strlen(str);
 	lowered = (char *) calloc(len+2, sizeof(char));
-	
+
 	for(i=0; i < len; i++) { lowered[i] = tolower(str[i]); }
 	lowered[i+1] = '\0';
 
@@ -325,10 +325,10 @@ void printMyData(void *list, void *node, void *data) {
 void trashData(void *data) {
 	int i;
 	FILENAME *x = (FILENAME *) data;
-	
+
 	//printMyData(NULL, NULL, data);
 
-	free(x->name);	
+	free(x->name);
 
 	if(x->ext)
 		free(x->ext);
@@ -346,7 +346,7 @@ void trashData(void *data) {
 			free(x->encA[i]);
 		free(x->encA);
 	}
-	
+
 	if(x->shortName)
 		free(x->shortName);
 
@@ -355,7 +355,7 @@ void trashData(void *data) {
 }
 
 
-// -1 -- arg1 < arg2 
+// -1 -- arg1 < arg2
 //  0 -- exact match
 //  1 -- arg1 > arg2
 int compareKeys ( void* dataOne, void* dataTwo)
@@ -370,8 +370,8 @@ int compareKeys ( void* dataOne, void* dataTwo)
 
 
 	res = strcmp(data1->name, data2->name);
-	
+
 	return res;
-} 
+}
 /* ************************************************/
 /* ************************************************/
