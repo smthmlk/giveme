@@ -33,14 +33,12 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 		*status = -1;
 	}
 	else {
-		//rawStrings = (char **) calloc(5, sizeof(char *));
 		buffer = (char *) calloc(MAX, sizeof(char));
 		toolAry = (TOOL **) calloc(NUMTOOLS+1, sizeof(TOOL *));
 
 		if(job->verbose) { printf("\nParsing \'%s\' for tool defintions...\n\n", txtfile); }
 
 		for( j=0; (res = fgets(buffer, MAX, fp)) != NULL; j++ ) {
-
 			size=-1;
 			rawStrings = NULL;
             //printf("readConf(): parsing CSV config line into separate strings\n");
@@ -55,17 +53,13 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 			}
 
 			toolAry[j] = buildTool(rawStrings);
-			free(rawStrings[2]);
-            free(rawStrings[4]);
 			free(rawStrings);
 		}
-
 
 		if(fclose(fp) == EOF) {
        		printf(">> Error closing file \'%s.\' Exiting.\n\n", txtfile);
 	   		exit(111);
 		}
-
 
 		// debugging info.
 		for(i=0; job->verbose && toolAry[i] != NULL; i++) {
@@ -84,7 +78,6 @@ TOOL **readConf(char *txtfile, int *status, JOB *job) {
 			printf("\n\n");
 		}
 
-		//free(rawStrings);
 		free(buffer);
 	}
 
@@ -131,10 +124,14 @@ TOOL *buildTool(char **rawStrings) {
 	newTool->name = rawStrings[0];
 	newTool->encPath = rawStrings[1];
 	newTool->decPath = rawStrings[3];
-    //printf("buildTool(): tokenizing encode string to array\n");
 	newTool->encAry = tokenizeString(rawStrings[2], ' ', &newTool->encArySize);
-    //printf("buildTool(): tokenizing decode string to array\n");
 	newTool->decAry = tokenizeString(rawStrings[4], ' ', &newTool->decArySize);
+
+    // elements 2 and 4 are no longer needed, so we can free them now
+    free(rawStrings[2]);
+    free(rawStrings[4]);
+    rawStrings[2] = NULL;
+    rawStrings[4] = NULL;
 
     //printf("buildTool(): created tool %s successfully\n", rawStrings[0]);
 	return newTool;
