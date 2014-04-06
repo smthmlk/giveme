@@ -16,6 +16,7 @@
 */
 
 #include "giveme.h"
+#include "time.h"
 
 int main(int argc, char **argv)
 {
@@ -101,6 +102,10 @@ void threadManager(TOOL **tools, JOB *job) {
 	currentNode = list->LL_head;
 	t_index = 0;
 	int busyThreadsCopy = 0;
+    struct timespec sleepTimeSpec;
+    struct timespec remainingTime;
+    sleepTimeSpec.tv_sec = 0;
+    sleepTimeSpec.tv_nsec = 50000000L;
 
 	// the non-verbose output is a simple progress indicator
 	if(! job->verbose) {
@@ -136,6 +141,9 @@ void threadManager(TOOL **tools, JOB *job) {
 			completedFiles++;
 			i++;
 		}
+        else
+            // sleep a small bit before checking again
+            nanosleep(&sleepTimeSpec, &remainingTime);
 	}
 
 	// clean up the assignment & thread arrays.
