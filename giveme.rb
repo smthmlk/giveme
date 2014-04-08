@@ -3,17 +3,16 @@ require 'logger'
 require 'set'
 require 'taglib'
 require 'thread'
+require 'ostruct'
+require 'optparse'
 
-# MusicFile
-# - filepath
-# - temp file (wav) path
-# - extension
-# - method to get wav filename
-# - method to get final filepath with proper extension: @arg path, @arg extension
-#
+# Represents a file that can be converted from one audio format to another
+# Also holds references (paths) to temporary wav files (+wavpath+), and the
+# converted file (+convpath+), including any specified destination directory
 class MusicFile
     attr_accessor :extension, :filename, :filepath, :wavpath, :convpath
 
+    # +filename+ - the path to a file
     def initialize(filename)
         @filename = File.basename(filename)
         @filepath = File.absolute_path(@filename, Dir.getwd)
@@ -44,29 +43,28 @@ class MusicFile
     end
 end
 
-# Tool
-# - path to exe: try to find automatically using env $PATH on start
-# - verifies path to exe is correct, and perms to execute are good
-# - encode/decode arguments from config file vs. built-in defaults
-# - method to encode: @arg MusicFile instance
-# - method to decode: @arg 
+# Represents a decoder/encoder for a specific audio format
 class Tool
-    def initialize(fileType, progName, exePath, encArgs, decArgs)
+    def initialize(fileType, progName, exePath, toolArgs)
         @logger = Logger.new(STDOUT)
         @logger.progname = "Tool:#{progName}"
         @fileType = fileType
         @progName = progName
         @exePath = exePath
+        @toolArgs = toolArgs
 
-        if exePath.nil? then
+        if exePath.nil?
             begin
                 @exePath = find_exe(@progName)
             rescue StandardError => e
-                @logger.warn("Could not find path to program #{@progName}: #{e.to_s}")
+                @logger.warn("Could not find path to Tool program #{@progName}: #{e.to_s}")
             end
         end
-        @decCommandTemplate = "#{@exePath} #{decArgs}"
-        @encCommandTemplate = "#{@exePath} #{encArgs}"
+        @commandTemplate = "#{@exePath} #{toolArgs}"
+    end
+
+    def to_s
+        "<Tool progName=\033[31m#{@progName}\033[0m exePath=\033[31m#{@exePath}\033[0m args='\033[32m#{@toolArgs}\033[0m'>"
     end
 
     def find_exe(progName)
@@ -81,35 +79,9 @@ class Tool
         raise StandardError "could not find program in $PATH env var"
     end
 
-    def to_s
-        "<Tool progName=\033[31m#{@progName}\033[0m exePath=\033[31m#{@exePath}\033[0m encArgs='\033[32m#{@encArgs}\033[0m' decArgs='\033[32m#{@decArgs}\033[0m'>"
-    end
-
-    def decode(musicFile, tempDir)
-        # tries to launch the exe with the decode parameters
-        # decode operations always have a temp directory destination
-        musicFile.wavpath = musicFile.make_dest_filepath(tempDir)
-        @logger.debug("Decoding \033[31m#{musicFile.filename}\033[0m to temp path \033[32;1m#{musicFile.wavpath}\033[0m")
-        run_command(musicFile.filepath, musicFile.wavpath, "decode")
-    end
-
-    def encode(musicFile, destDir)
-        # tries to launch the exe with the encode parameters
-        musicFile.convpath = musicFile.make_dest_filepath(destDir, @fileType)
-        @logger.debug("Encoding \033[33m#{musicFile.wavpath}\033[0m to \033[32;1m#{musicFile.convpath}\033[0m")
-        run_command(musicFile.wavpath, musicFile.convpath, "encode")
-    end
-
-    private
     def run_command(infile, outfile, opName)
         # build encode command
-        if opName.eql?('decode')
-            command = @decCommandTemplate.sub("$INFILE", "\"#{infile}\"").sub("$OUTFILE", "\"#{outfile}\"")
-        elsif opName.eql?('encode')
-            command = @encCommandTemplate.sub("$INFILE", "\"#{infile}\"").sub("$OUTFILE", "\"#{outfile}\"")
-        else
-            raise ArgumentError, "invalid opName given: must be decode or encode"
-        end
+        command = @commandTemplate.sub("$INFILE", "\"#{infile}\"").sub("$OUTFILE", "\"#{outfile}\"")
         @logger.debug("Command=#{command}")
 
         begin
@@ -126,15 +98,29 @@ class Tool
     end
 end
 
-#
-# ConversionJob
-# - takes input file/path
-# - takes output path
-# - takes dest format
-# - takes number of threads (optional; otherwise, counts num cpus and uses that)
-# - matches tools to files found vs. dest format
-# - kicks off threads to do actual conversion (simple method)
-# - runs Tagger on origin and dest files to preserve tags
+class Encoder < Tool
+    def encode(musicFile, destDir)
+        # tries to launch the exe with the encode parameters
+        musicFile.convpath = musicFile.make_dest_filepath(destDir, @fileType)
+        @logger.debug("Encoding \033[33m#{musicFile.wavpath}\033[0m to \033[32;1m#{musicFile.convpath}\033[0m")
+        run_command(musicFile.wavpath, musicFile.convpath, "encode")
+    end
+end
+
+class Decoder < Tool
+    def decode(musicFile, tempDir)
+        # tries to launch the exe with the decode parameters
+        # decode operations always have a temp directory destination, and we need to ensure no old wav file there exists with the same name
+        musicFile.wavpath = musicFile.make_dest_filepath(tempDir)
+        if File.exists?(musicFile.wavpath)
+            File.delete(musicFile.wavpath)
+        end
+
+        @logger.debug("Decoding \033[31m#{musicFile.filename}\033[0m to temp path \033[32;1m#{musicFile.wavpath}\033[0m")
+        run_command(musicFile.filepath, musicFile.wavpath, "decode")
+    end
+end
+
 class ConversionJob
     attr_accessor :outputFormat, :outputFileL
 
@@ -158,7 +144,11 @@ class ConversionJob
     end
 
     def start_conversion
-        encTool = @toolH[@outputFormat]
+        encTool = @toolH[@outputFormat]['encode']
+        if encTool.nil?
+            @logger.error("No encoder available for desired output format #{@outputFormat}")
+            abort("")
+        end
         threadL = Array.new
         mutex = Mutex.new
 
@@ -177,7 +167,7 @@ class ConversionJob
                     end
 
                     # find appropriate tool to decode the file
-                    decTool = @toolH[musicFile.getExtension()]
+                    decTool = @toolH[musicFile.getExtension()]['decode']
                     decTool.decode(musicFile, @tempDir)
 
                     # encode to the desired output dir
@@ -232,8 +222,10 @@ class Manager
             # We know what tools are available to us, so we can look for files with extensions that match
             @logger.debug("FileTypes that can be converted: #{@validExtensionsS.inspect()}")
             @logger.debug("Found #{@toolH.size} tools:")
-            @toolH.each_pair do |fileType, tool|
-                @logger.debug("  [#{fileType}] => #{tool.to_s}")
+            @toolH.each_pair do |fileType, toolStruct|
+                @logger.debug("  [#{fileType}]")
+                @logger.debug("     + \033[33;1mencoder:\033[0m #{toolStruct['encode'].to_s}")
+                @logger.debug("     + \033[33;1mdecoder:\033[0m #{toolStruct['decode'].to_s}")
             end
         end
     end
@@ -252,7 +244,7 @@ class Manager
         # find music files in the CWD
         @logger.debug("Examining #{Dir.entries('.').size} files in #{File.absolute_path(".", ".")}")
         Dir.entries(".").each do |i|
-            unless i.start_with?('.')
+            unless i.start_with?('.') || File.directory?(i)
                 musicFile = check_file(File.absolute_path(i, "."))
                 @fileL << musicFile unless musicFile.nil?
             end
@@ -269,11 +261,11 @@ class Manager
         # TODO
     end
 
-    def convert
+    def convert(outputFormat, outputDir, numThreads)
         # TODO: add parameters so jobs can be built
         # builds a job and begins the conversion
         #def initialize(fileL, outputPath, outputFormat, numThreads, toolH, tempDir)
-        job = ConversionJob.new(@fileL, ".", "mp3", 2, @toolH, "/tmp")
+        job = ConversionJob.new(@fileL, outputDir, outputFormat, numThreads, @toolH, "/tmp")
         job.start_conversion()
         Tagger.new().tag(job)
     end
@@ -281,8 +273,12 @@ class Manager
     private
     def load_default_tools
         @logger.debug("looking for default tools")
-        @toolH['mp3'] = Tool.new("mp3", "lame", nil, "-V0 --vbr-new --quiet $INFILE $OUTFILE", "--quiet --decode $INFILE $OUTFILE")
-        @toolH['flac'] = Tool.new("flac", "flac", nil, "-V -8 --silent -o $OUTFILE $INFILE", "--decode -s -o $OUTFILE $INFILE")
+        @toolH['mp3'] = OpenStruct.new("encode" => Encoder.new("mp3", "lame", nil, "-V0 --vbr-new --quiet $INFILE $OUTFILE"),
+                                   "decode" => Decoder.new("mp3", "lame", nil, "--quiet --decode $INFILE $OUTFILE"))
+        @toolH['flac'] = OpenStruct.new("encode" => Encoder.new("flac", "flac", nil, "-V -8 --silent -o $OUTFILE $INFILE"),
+                                    "decode" => Decoder.new("flac", "flac", nil, "--decode -s -o $OUTFILE $INFILE"))
+        @toolH['wav'] = OpenStruct.new("encode" => Encoder.new("wav", "mv", nil, "$INFILE $OUTFILE"),
+                                       "decode" => Decoder.new("wav", "mv", nil, "$INFILE $OUTFILE"))
     end
 
     def load_user_defined_tools
@@ -343,6 +339,56 @@ class Tagger
     end
 end
 
+# Parse options
+# setting some required defaults first
+options = {numThreads: 2,
+           outputDir: '.'}
+
+FORMATS = ["mp3", "wav", "flac", "ogg", "ape"]
+VERSION = "4.0.0"
+YEAR = 2014
+
+OptionParser.new do |opts|
+    opts.banner = "Usage: giveme -f DESIRED_AUDIO_FORMAT [options]"
+
+    opts.on("-v", "--version", "Show version information and exit") do |version|
+        options[:version] = version
+    end
+
+    opts.on("-t N", "--threads N", Integer, "Set the number of threads to use to N. Default 2") do |numThreads|
+        options[:numThreads] = numThreads
+    end
+
+    opts.on("-f FORMAT", "--format FORMAT", FORMATS, "Select the desired output audio format; must be one of #{FORMATS.join(" ")}") do |format|
+        options[:format] = format
+    end
+
+    opts.on("-o DIR", "Select the output directory the converted files should be placed in. Defaults to '.'") do |outputDir|
+        options[:outputDir] = outputDir
+    end
+end.parse!
+
+# Validate some options
+if options[:version]
+    puts "giveme #{VERSION}, #{YEAR}"
+    exit
+end
+
+if options[:format].nil?
+    puts "You must provide a format using -f, and specify one of #{FORMATS.join(" ")}"
+    exit
+end
+
+if options[:numThreads] <= 0 || options[:numThreads] > 24
+    puts "Invalid value given for -t/--threads; must be between 1 and 24"
+    exit
+end
+
+if ! File.exists?(options[:outputDir]) || ! File.writable?(options[:outputDir])
+    puts "Provided output directory \"#{options[:outputDir]}\" either doesn't exist or is not writable by your user"
+    exit
+end
+
 mgr = Manager.new
 mgr.find_files_from_cwd()
-mgr.convert()
+mgr.convert(options[:format], options[:outputDir], options[:numThreads])
