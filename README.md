@@ -1,25 +1,20 @@
 giveme
 ======
 
-Multi-threaded audio conversion utility with lots of configurability, written in C over 2007-2009. It lets you use existing audio encoder/decoder builds, and set any parameters you want for each independently. It does not handle tagging as that was a feature I never got around to dealing with.
+Multi-threaded audio conversion utility with lots of configurability, written in Ruby in 2014. It lets you use existing audio encoder/decoder builds, and set any parameters you want for each independently. It automatically preserves tags from the source audio file (if present) and sets them in the converted files using taglib.
 
-The primary problem I solved in writing giveme many years ago was to decrease the time it took to convert a lot of flac files to mp3s: my system had two physical CPU cores, but lame, flac, etc are all single-threaded. I wrote this as an exercise to toy with pthreads and to parallelize the decode/encode process for n audio files.
+The primary problem I solved in writing giveme many years ago was to decrease the time it took to convert a lot of flac files to mp3s: my system had two physical CPU cores, but lame, flac, etc are all single-threaded. Originally, this began in 1.x and 2.x as a rather involved bash script; later, with 3.x, I rewrote it in C as an exercise to toy with pthreads and to parallelize the decode/encode process for n audio files with more control. The 4.x incarnation is an excuse to play with Ruby, and to fix the tagging issue never addressed in any previous versions.
 
 Installation
 ------------
 
-To compile, follow the usual build pattern:
+Eventually there will be a simple Makefile to install the ruby script in /usr/bin or so. For now, manually drop it in somewhere and chmod +x it.
 
-```bash
-$ ./configure
-$ make
-$ sudo make install
-```
-
-giveme is known to compile on most any linux distribution and MacOSX.
+You will need Ruby >= 2.0 and taglib-ruby >= 0.6, which can be installed using `gem install taglib-ruby`.
 
 Features
 --------
+NOTE: this has yet to be updated from 3.x
 
 You should read the built-in help, first:
 
