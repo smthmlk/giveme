@@ -6,6 +6,9 @@ require 'thread'
 require 'ostruct'
 require 'optparse'
 
+# Default log level used by all classes, overridden by option
+$logLevel = Logger::WARN
+
 # Represents a file that can be converted from one audio format to another
 # Also holds references (paths) to temporary wav files (+wavpath+), and the
 # converted file (+convpath+), including any specified destination directory
@@ -49,7 +52,8 @@ private
 class Tool
     def initialize(fileType, progName, exePath, toolArgs)
         @logger = Logger.new(STDOUT)
-        @logger.progname = "Tool:#{progName}"
+        @logger.progname = "Tool->#{progName}"
+        @logger.level = $logLevel
         @fileType = fileType
         @progName = progName
         @exePath = exePath
@@ -130,6 +134,7 @@ class ConversionJob
     def initialize(fileL, outputPath, outputFormat, numThreads, toolH, tempDir)
         @logger = Logger.new(STDOUT)
         @logger.progname = "ConversionJob"
+        @logger.level = $logLevel
         # a list of MusicFile instances to convert
         @fileL = fileL
         # a list of MusicFile's that have been converted
@@ -144,6 +149,10 @@ class ConversionJob
         @toolH = toolH
         # where all wav intermediary files must go
         @tempDir = tempDir
+        # task counts used for status updates
+        @totalTasks = nil
+        @completedTasks = 0.0
+        @taskStatusMutex = Mutex.new
     end
 
     def start_conversion
@@ -154,6 +163,7 @@ class ConversionJob
         end
         threadL = Array.new
         mutex = Mutex.new
+        @totalTasks = 2.0 * @fileL.size
 
         1.upto([@numThreads, @fileL.size].min) do
             # create a thread
@@ -163,6 +173,7 @@ class ConversionJob
 
                 while done.eql?(false)
                     # get a file, safely
+                    show_status()
                     musicFile = mutex.synchronize { @fileL.pop }
                     if musicFile.nil?
                         done = true
@@ -172,6 +183,8 @@ class ConversionJob
                     # find appropriate tool to decode the file
                     decTool = @toolH[musicFile.getExtension()]['decode']
                     decTool.decode(musicFile, @tempDir)
+                    @taskStatusMutex.synchronize { @completedTasks += 1 }
+                    show_status()
 
                     # encode to the desired output dir
                     encTool.encode(musicFile, @outputPath)
@@ -187,29 +200,36 @@ class ConversionJob
 
                     # add to completed file list, safely
                     mutex.synchronize { @outputFileL << musicFile }
+                    @taskStatusMutex.synchronize { @completedTasks += 1 }
+                    show_status()
                 end
             }
         end
 
         # wait for threads to finish
-        @logger.info("#{threadL.size} running")
+        @logger.debug("#{threadL.size} running")
         threadL.each do |thr|
             thr.join()
-            @logger.info("thread #{thr.to_s} joined")
+            @logger.debug("thread #{thr.to_s} joined")
         end
-        @logger.info("finished")
+        puts "\r\n"
+    end
+
+    private
+    def show_status
+        @taskStatusMutex.synchronize {
+            printf("\r%0.1f%%", 100 * @completedTasks / @totalTasks)
+            STDOUT.flush
+        }
     end
 end
 
-#
-# Manager
-# - builds tool instances from default values vs. config file
-# - examines options/CWD for music files
-# - contains one or more ConversionJob instances that it creates from parsed options
+
 class Manager
     def initialize()
         @logger = Logger.new(STDOUT)
         @logger.progname = "Manager"
+        @logger.level = $logLevel
         @fileL = Array.new
 
         # load tools
@@ -269,7 +289,6 @@ class Manager
 
     public
     def convert(outputFormat, outputDir, numThreads)
-        # TODO: add parameters so jobs can be built
         # builds a job and begins the conversion
         #def initialize(fileL, outputPath, outputFormat, numThreads, toolH, tempDir)
         job = ConversionJob.new(@fileL, outputDir, outputFormat, numThreads, @toolH, "/tmp")
@@ -294,16 +313,12 @@ class Manager
     end
 end
 
-# Tagger
-# - method to tag a single job, which calls one or more other methods:
-#   1) get CLI tags
-#   2) if any tags missing, try to harvest from source file
-#   3) if required tags missing, try to guess from directory name
-#   if required tags still missing, fail
+
 class Tagger
     def initialize(cli_album=nil, cli_artist=nil, cli_year=nil)
         @logger = Logger.new(STDOUT)
         @logger.progname = "Tagger"
+        @logger.level = $logLevel
         # these may be nil, but they override all others
         @cliAlbum = cli_album
         @cliArtist = cli_artist
@@ -347,6 +362,7 @@ class Tagger
     end
 end
 
+
 ############################################################################
 # Parse options
 # setting some required defaults first
@@ -375,6 +391,10 @@ OptionParser.new do |opts|
     opts.on("-o DIR", "Select the output directory the converted files should be placed in. Defaults to '.'") do |outputDir|
         options[:outputDir] = outputDir
     end
+
+    opts.on("-V", "--verbose", "Turn on verbose logging") do |verbose|
+        options[:verbose]
+    end
 end.parse!
 
 # Validate some options and generally prepare for the work to be done
@@ -391,6 +411,10 @@ end
 if options[:numThreads] <= 0 || options[:numThreads] > 24
     puts "Invalid value given for -t/--threads; must be between 1 and 24"
     exit
+end
+
+unless options[:verbose].nil?
+    $logLevel = Logger::DEBUG
 end
 
 unless File.exists?(options[:outputDir])
