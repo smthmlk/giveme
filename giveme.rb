@@ -9,6 +9,7 @@ require 'optparse'
 # Represents a file that can be converted from one audio format to another
 # Also holds references (paths) to temporary wav files (+wavpath+), and the
 # converted file (+convpath+), including any specified destination directory
+private
 class MusicFile
     attr_accessor :extension, :filename, :filepath, :wavpath, :convpath
 
@@ -44,6 +45,7 @@ class MusicFile
 end
 
 # Represents a decoder/encoder for a specific audio format
+private
 class Tool
     def initialize(fileType, progName, exePath, toolArgs)
         @logger = Logger.new(STDOUT)
@@ -121,6 +123,7 @@ class Decoder < Tool
     end
 end
 
+private
 class ConversionJob
     attr_accessor :outputFormat, :outputFileL
 
@@ -230,6 +233,7 @@ class Manager
         end
     end
 
+    private
     def check_file(filepath)
         begin
             musicFile = MusicFile.new(filepath)
@@ -240,6 +244,7 @@ class Manager
         end
     end
 
+    public
     def find_files_from_cwd
         # find music files in the CWD
         @logger.debug("Examining #{Dir.entries('.').size} files in #{File.absolute_path(".", ".")}")
@@ -256,11 +261,13 @@ class Manager
         end
     end
 
+    public
     def find_files_from_cli
         # use names/paths from CLI args 
         # TODO
     end
 
+    public
     def convert(outputFormat, outputDir, numThreads)
         # TODO: add parameters so jobs can be built
         # builds a job and begins the conversion
@@ -281,6 +288,7 @@ class Manager
                                        "decode" => Decoder.new("wav", "mv", nil, "$INFILE $OUTFILE"))
     end
 
+    private
     def load_user_defined_tools
         @logger.debug("not loading user-defined tools yet")
     end
@@ -339,6 +347,7 @@ class Tagger
     end
 end
 
+############################################################################
 # Parse options
 # setting some required defaults first
 options = {numThreads: 2,
@@ -368,7 +377,7 @@ OptionParser.new do |opts|
     end
 end.parse!
 
-# Validate some options
+# Validate some options and generally prepare for the work to be done
 if options[:version]
     puts "giveme #{VERSION}, #{YEAR}"
     exit
@@ -384,9 +393,14 @@ if options[:numThreads] <= 0 || options[:numThreads] > 24
     exit
 end
 
-if ! File.exists?(options[:outputDir]) || ! File.writable?(options[:outputDir])
-    puts "Provided output directory \"#{options[:outputDir]}\" either doesn't exist or is not writable by your user"
-    exit
+unless File.exists?(options[:outputDir])
+    begin
+        puts "Output directory \"#{options[:outputDir]}\" does not exist; creating"
+        Dir.mkdir(options[:outputDir])
+    rescue Exception => e
+        puts "Error: could not create directory (#{e.to_s})"
+        exit
+    end
 end
 
 mgr = Manager.new
