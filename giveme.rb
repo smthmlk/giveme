@@ -16,10 +16,10 @@ private
 class MusicFile
   attr_accessor :extension, :filename, :filepath, :wavpath, :convpath
 
-  # +filename+ - the path to a file
-  def initialize(filename)
-    @filename = File.basename(filename)
-    @filepath = File.absolute_path(@filename, Dir.getwd)
+  # +filepath+ - the path to a file
+  def initialize(filepath)
+    @filename = File.basename(filepath)
+    @filepath = File.absolute_path(filepath)
     @wavpath = nil
     @convpath = nil
     @extension = File.extname(@filename)
@@ -100,6 +100,7 @@ class Tool
     # check that everything went fine
     return true unless retVal.eql?(false)
     @logger.error("Failed to #{opName} file: command returned false, retcode=#{$?}")
+    @logger.error("Command was: #{command}")
     return nil
   end
 end
@@ -122,7 +123,7 @@ class Decoder < Tool
       File.delete(musicFile.wavpath)
     end
 
-    @logger.debug("Decoding \033[31m#{musicFile.filename}\033[0m to temp path \033[32;1m#{musicFile.wavpath}\033[0m")
+    @logger.debug("Decoding \033[31m#{musicFile.filepath}\033[0m to temp path \033[32;1m#{musicFile.wavpath}\033[0m")
     run_command(musicFile.filepath, musicFile.wavpath, "decode")
   end
 end
@@ -257,10 +258,12 @@ class Manager
 
   def find_files_from_cwd
     # find music files in the CWD
-    @logger.debug("Examining #{Dir.entries('.').size} files in #{File.absolute_path(".", ".")}")
-    Dir.entries(".").each do |filePath|
-      unless filePath.start_with?('.') || File.directory?(filePath)
-        musicFile = check_file(File.absolute_path(filePath, "."))
+    cwd = Dir.getwd
+    @logger.debug("Examining #{Dir.entries(cwd).size} files in #{File.absolute_path(".", ".")}")
+    Dir.entries(cwd).each do |filePath|
+      absFilePath = File.absolute_path(filePath, cwd)
+      unless absFilePath.start_with?('.') || File.directory?(absFilePath)
+        musicFile = check_file(absFilePath)
         @fileL << musicFile unless musicFile.nil?
       end
     end
@@ -269,8 +272,9 @@ class Manager
   def find_files_from_cli(inputFiles)
     @logger.debug("converting #{inputFiles.size} files from command line")
     inputFiles.each do |filePath|
+      absFilePath = File.absolute_path(filePath)
       unless File.directory?(filePath)
-        musicFile = check_file(File.absolute_path(filePath, "."))
+        musicFile = check_file(absFilePath)
         @fileL << musicFile unless musicFile.nil?
       end
     end
@@ -279,7 +283,7 @@ class Manager
   def convert(outputFormat, outputDir, numThreads)
     @logger.debug("Convertity #{@fileL.size} files:")
     @fileL.each do |musicFile|
-      @logger.debug(" + [#{musicFile.getExtension.upcase}] #{musicFile.filename}")
+      @logger.debug(" + [#{musicFile.getExtension.upcase}] #{musicFile.filepath}")
     end
 
     # builds a job and begins the conversion
@@ -431,8 +435,6 @@ end
 unless options[:verbose].nil?
   $logLevel = Logger::DEBUG
 end
-
-puts options
 
 unless File.exists?(options[:outputDir])
   begin
