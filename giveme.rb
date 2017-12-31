@@ -173,7 +173,7 @@ class ConversionJob
 
         while done.eql?(false)
           # get a file, safely
-          show_status()
+          show_status
           musicFile = mutex.synchronize { @fileL.pop }
           if musicFile.nil?
             done = true
@@ -181,10 +181,10 @@ class ConversionJob
           end
 
           # find appropriate tool to decode the file
-          decTool = @toolH[musicFile.getExtension()]['decode']
+          decTool = @toolH[musicFile.getExtension]['decode']
           decTool.decode(musicFile, @tempDir)
           @taskStatusMutex.synchronize { @completedTasks += 1 }
-          show_status()
+          show_status
 
           # encode to the desired output dir
           encTool.encode(musicFile, @outputPath)
@@ -201,7 +201,7 @@ class ConversionJob
           # add to completed file list, safely
           mutex.synchronize { @outputFileL << musicFile }
           @taskStatusMutex.synchronize { @completedTasks += 1 }
-          show_status()
+          show_status
         end
       }
     end
@@ -209,7 +209,7 @@ class ConversionJob
     # wait for threads to finish
     @logger.debug("#{threadL.size} running")
     threadL.each do |thr|
-      thr.join()
+      thr.join
       @logger.debug("thread #{thr.to_s} joined")
     end
     puts "\r\n"
@@ -226,7 +226,7 @@ end
 
 
 class Manager
-  def initialize()
+  def initialize
     @logger = Logger.new(STDOUT)
     @logger.progname = "Manager"
     @logger.level = $logLevel
@@ -235,14 +235,14 @@ class Manager
     # load tools
     #  fileExt => Tool instance
     @toolH = Hash.new
-    load_user_defined_tools()
+    load_user_defined_tools
     if @toolH.empty?
       @logger.error("Found no encoders/decoders, so we cannot do anything. Exiting")
       abort("")
     else
       @validExtensionsS = Set.new(@toolH.each_key)
       # We know what tools are available to us, so we can look for files with extensions that match
-      @logger.debug("FileTypes that can be converted: #{@validExtensionsS.inspect()}")
+      @logger.debug("FileTypes that can be converted: #{@validExtensionsS.inspect}")
       @logger.debug("Found #{@toolH.size} tools:")
       @toolH.each_pair do |fileType, toolStruct|
         @logger.debug("  [#{fileType}]")
@@ -252,49 +252,51 @@ class Manager
     end
   end
 
+  def find_files_from_cwd
+    # find music files in the CWD
+    @logger.debug("Examining #{Dir.entries('.').size} files in #{File.absolute_path(".", ".")}")
+    Dir.entries(".").each do |filePath|
+      unless filePath.start_with?('.') || File.directory?(filePath)
+        musicFile = check_file(File.absolute_path(filePath, "."))
+        @fileL << musicFile unless musicFile.nil?
+      end
+    end
+  end
+
+  def find_files_from_cli(inputFiles)
+    @logger.debug("converting #{inputFiles.size} files from command line")
+    inputFiles.each do |filePath|
+      unless File.directory?(filePath)
+        musicFile = check_file(File.absolute_path(filePath, "."))
+        @fileL << musicFile unless musicFile.nil?
+      end
+    end
+  end
+
+  def convert(outputFormat, outputDir, numThreads)
+    @logger.debug("Convertity #{@fileL.size} files:")
+    @fileL.each do |musicFile|
+      @logger.debug(" + [#{musicFile.getExtension.upcase}] #{musicFile.filename}")
+    end
+
+    # builds a job and begins the conversion
+    #def initialize(fileL, outputPath, outputFormat, numThreads, toolH, tempDir)
+    job = ConversionJob.new(@fileL, outputDir, outputFormat, numThreads, @toolH, "/tmp")
+    job.start_conversion
+
+    # try to copy over tags from the original file
+    Tagger.new.tag(job)
+  end
+
   private
   def check_file(filepath)
     begin
       musicFile = MusicFile.new(filepath)
-      return @validExtensionsS.include?(musicFile.getExtension()) ? musicFile : nil
+      return @validExtensionsS.include?(musicFile.getExtension) ? musicFile : nil
     rescue StandardError => e
       @logger.debug("File #{filepath} is not a valid file for conversion: #{e}")
       return nil
     end
-  end
-
-  public
-  def find_files_from_cwd
-    # find music files in the CWD
-    @logger.debug("Examining #{Dir.entries('.').size} files in #{File.absolute_path(".", ".")}")
-    Dir.entries(".").each do |i|
-      unless i.start_with?('.') || File.directory?(i)
-        musicFile = check_file(File.absolute_path(i, "."))
-        @fileL << musicFile unless musicFile.nil?
-      end
-    end
-
-    @logger.debug("Found #{@fileL.size} files")
-    @fileL.each do |i|
-      @logger.debug(" + [#{i.getExtension().upcase}] #{i.filename}")
-    end
-  end
-
-  public
-  def find_files_from_cli
-    # use names/paths from CLI args 
-    # TODO
-  end
-
-  public
-  def convert(outputFormat, outputDir, numThreads)
-    # builds a job and begins the conversion
-    #def initialize(fileL, outputPath, outputFormat, numThreads, toolH, tempDir)
-    job = ConversionJob.new(@fileL, outputDir, outputFormat, numThreads, @toolH, "/tmp")
-    job.start_conversion()
-
-    # try to copy over tags from the original file
-    Tagger.new().tag(job)
   end
 
   private
@@ -359,7 +361,7 @@ class Tagger
               dstFileRef.tag.track = srcFileRef.tag.track
               @logger.debug(" => track:\033[33m#{srcFileRef.tag.track}\033[0m")
               @logger.debug("Tagged #{musicFile.convpath} successfully")
-              dstFileRef.save()
+              dstFileRef.save
             end
           else
             @logger.info("Source file has no tag; must source tag from directory/filenames")
@@ -393,7 +395,7 @@ OptionParser.new do |opts|
     options[:numThreads] = numThreads
   end
 
-  opts.on("-f FORMAT", "--format FORMAT", FORMATS, "Select the desired output audio format; must be one of #{FORMATS.join(" ")}") do |format|
+  opts.on("-f FORMAT", "--format FORMAT", FORMATS, :REQUIRED, "Select the desired output audio format; must be one of #{FORMATS.join(" ")}") do |format|
     options[:format] = format
   end
 
@@ -404,16 +406,16 @@ OptionParser.new do |opts|
   opts.on("-V", "--verbose", "Turn on verbose logging") do |verbose|
     options[:verbose] = true
   end
+
+  opts.on("-i FILENAME", "Specify a single file to convert. May be specified multiple times") do |input|
+    options[:inputFiles] ||= []
+    options[:inputFiles] << input
+  end
 end.parse!
 
 # Validate some options and generally prepare for the work to be done
 if options[:version]
   puts "giveme #{VERSION}, #{YEAR}"
-  exit
-end
-
-if options[:format].nil?
-  puts "Error: you must provide a format using -f, and specify one of #{FORMATS.join(" ")}"
   exit
 end
 
@@ -426,6 +428,8 @@ unless options[:verbose].nil?
   $logLevel = Logger::DEBUG
 end
 
+puts options
+
 unless File.exists?(options[:outputDir])
   begin
     puts "Output directory \"#{options[:outputDir]}\" does not exist; creating"
@@ -437,6 +441,14 @@ unless File.exists?(options[:outputDir])
 end
 
 mgr = Manager.new
+
+# create a list of files to convert
+if options[:inputFiles].nil?
+  # user did not supply a -i arg, so assume they want to convert every applicable file in CWD
+  mgr.find_files_from_cwd
+else
+  mgr.find_files_from_cli(options[:inputFiles])
+end
+
 # TODO; this returns an array of individual files to convert; need to finish the -i option.
-mgr.find_files_from_cwd()
 mgr.convert(options[:format], options[:outputDir], options[:numThreads])
