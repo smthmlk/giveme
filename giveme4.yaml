@@ -1,0 +1,37 @@
+# Configuration file for giveme version 4. This is YAML; see http://yaml.org/ for more information
+# about writing YAML. It must be placed in your home directory (~) and named ".giveme4.yaml" (hidden
+# file).
+#
+# All you need to do to add a tool is copy format used below, changing just the extension ('mp3',
+# 'wav', etc) and the exePath and args values appropriately for the tool.
+#
+# For the tools already listed below, you may need to adjust their exePaths to the right paths on
+# your system (if you want to use them).
+mp3:
+    encode:
+        exePath: /usr/local/bin/lame
+        args: -V0 --quiet $INFILE $OUTFILE
+    decode:
+        exePath: /usr/local/bin/lame
+        args: --decode --quiet $INFILE $OUTFILE
+
+
+flac:
+    encode:
+        exePath: /usr/local/bin/flac
+        args: -V -8 --silent -o $OUTFILE $INFILE
+    decode:
+        exePath: /usr/local/bin/flac
+        args: --decode -s -o $OUTFILE $INFILE
+
+# DO NOT REMOVE THIS TOOL
+# special case: we just need to move wav files around on disk so they work as sources or destinations
+# for other tools. if this "tool" is not present, giveme simply won't work. It remains here in case
+# users need to adjust where `cp' is on their system.
+wav:
+    encode:
+        exePath: /bin/cp
+        args: $INFILE $OUTFILE
+    decode:
+        exePath: /bin/cp
+        args: $INFILE $OUTFILE
