@@ -46,8 +46,12 @@ $ giveme -f wav --outdir /var/tmp/wavez
 ```
 
 The directory 'dirThatHasMusicFilesInIt' should have music which you have a decoder for. If they are .mp3 files, you
-should have Lame installed, for example. 'giveme' then
-decodes them to the .wav format and puts them in a new
-directory in /var/tmp called 'wavez'. You can omit the 
---outdir option and it would put the .wav files in the same
+should have Lame installed, for example. 'giveme' then decodes them to the .wav format and puts them in a new
+directory in /var/tmp called 'wavez'. You can omit the `-o` option and it would put the .wav files in the same
 directory as the .mp3s.
+
+You can also specify individual files to convert by using the `-i` option. This can be used multiple times to convert more than one file. As always, the input files can be in different formats.
+
+```bash
+$ giveme.rb -f mp3 -o MyOutputDir -i BeautifulLife.flac -i NeverGonnaSayImSorry.m4a -i WhispersInBlindess.wav
+```
