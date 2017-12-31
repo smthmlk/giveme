@@ -127,6 +127,8 @@ class Decoder < Tool
   end
 end
 
+# Models a batch of files to be converted and the properties of the requested conversion, and contains
+# the logic to perform the conversion.
 private
 class ConversionJob
   attr_accessor :outputFormat, :outputFileL
@@ -225,6 +227,7 @@ class ConversionJob
 end
 
 
+# Manages tools, identifying suitable music files to convert, and the conversion process.
 class Manager
   def initialize
     @logger = Logger.new(STDOUT)
@@ -324,6 +327,7 @@ class Manager
 end
 
 
+# Handles reading and writing tags on music files.
 class Tagger
   def initialize(cli_album=nil, cli_artist=nil, cli_year=nil)
     @logger = Logger.new(STDOUT)
@@ -450,5 +454,4 @@ else
   mgr.find_files_from_cli(options[:inputFiles])
 end
 
-# TODO; this returns an array of individual files to convert; need to finish the -i option.
 mgr.convert(options[:format], options[:outputDir], options[:numThreads])
