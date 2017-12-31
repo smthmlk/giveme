@@ -436,6 +436,7 @@ unless File.exists?(options[:outputDir])
   end
 end
 
-Manager.new.
-        find_files_from_cwd().
-        convert(options[:format], options[:outputDir], options[:numThreads])
+mgr = Manager.new
+# TODO; this returns an array of individual files to convert; need to finish the -i option.
+mgr.find_files_from_cwd()
+mgr.convert(options[:format], options[:outputDir], options[:numThreads])
