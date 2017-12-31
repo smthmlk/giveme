@@ -1,10 +1,10 @@
 #!/usr/bin/ruby
 require 'logger'
+require 'optparse'
 require 'set'
 require 'taglib'
 require 'thread'
-require 'ostruct'
-require 'optparse'
+require 'yaml'
 
 # Default log level used by all classes, overridden by option
 $logLevel = Logger::WARN
@@ -235,7 +235,6 @@ class Manager
         # load tools
         #  fileExt => Tool instance
         @toolH = Hash.new
-        load_default_tools()
         load_user_defined_tools()
         if @toolH.empty?
             @logger.error("Found no encoders/decoders, so we cannot do anything. Exiting")
@@ -297,19 +296,27 @@ class Manager
     end
 
     private
-    def load_default_tools
-        @logger.debug("looking for default tools")
-        @toolH['mp3'] = OpenStruct.new("encode" => Encoder.new("mp3", "lame", nil, "-V0 --vbr-new --quiet $INFILE $OUTFILE"),
-                                   "decode" => Decoder.new("mp3", "lame", nil, "--quiet --decode $INFILE $OUTFILE"))
-        @toolH['flac'] = OpenStruct.new("encode" => Encoder.new("flac", "flac", nil, "-V -8 --silent -o $OUTFILE $INFILE"),
-                                    "decode" => Decoder.new("flac", "flac", nil, "--decode -s -o $OUTFILE $INFILE"))
-        @toolH['wav'] = OpenStruct.new("encode" => Encoder.new("wav", "mv", nil, "$INFILE $OUTFILE"),
-                                       "decode" => Decoder.new("wav", "mv", nil, "$INFILE $OUTFILE"))
-    end
-
-    private
     def load_user_defined_tools
-        @logger.debug("not loading user-defined tools yet")
+      # look for the giveme4.conf file in the user's home-dir
+      confPath = "#{ENV['HOME']}/.giveme4.yaml"
+      @logger.debug("loading user-defined tool definitions from #{confPath}")
+      tools = YAML.load(File.open(confPath))
+      @logger.debug("found #{tools.size} tools")
+      toolPair = Struct.new(:encode, :decode)
+
+      tools.each do |rawExtension, toolHash|
+        ext = rawExtension.strip.downcase
+        #def initialize(fileType, progName, exePath, toolArgs)
+        encoder = Encoder.new(ext,
+                              File.basename(toolHash.fetch('encode').fetch('exePath').strip),
+                              toolHash.fetch('encode').fetch('exePath').strip,
+                              toolHash.fetch('encode').fetch('args').strip)
+        decoder = Decoder.new(ext,
+                              File.basename(toolHash.fetch('decode').fetch('exePath').strip),
+                              toolHash.fetch('decode').fetch('exePath').strip,
+                              toolHash.fetch('decode').fetch('args').strip)
+        @toolH[ext] = toolPair.new(encoder, decoder)
+      end
     end
 end
 
@@ -369,9 +376,10 @@ end
 options = {numThreads: 2,
            outputDir: '.'}
 
-FORMATS = ["mp3", "wav", "flac", "ogg", "ape"]
-VERSION = "4.0.0"
-YEAR = 2014
+# This isn't great, because a user is likely to define an extension and tool in their conf. TODO: remove this.
+FORMATS = ["mp3", "wav", "flac", "ogg", "ape", "m4a"]
+VERSION = "4.0.1"
+YEAR = 2017
 
 OptionParser.new do |opts|
     opts.banner = "Usage: giveme -f DESIRED_AUDIO_FORMAT [options]"
@@ -393,7 +401,7 @@ OptionParser.new do |opts|
     end
 
     opts.on("-V", "--verbose", "Turn on verbose logging") do |verbose|
-        options[:verbose]
+        options[:verbose] = true
     end
 end.parse!
 

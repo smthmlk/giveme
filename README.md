@@ -10,7 +10,14 @@ Installation
 
 Eventually there will be a simple Makefile to install the ruby script in /usr/bin or so. For now, manually drop it in somewhere and chmod +x it.
 
-You will need Ruby >= 2.0 and taglib-ruby >= 0.6, which can be installed using `gem install taglib-ruby`.
+You will need Ruby >= 2.0 and taglib-ruby >= 0.6, which can be installed using `gem install taglib-ruby`. To install tablib on OSX, you will first need Xcode command line tools installed (`xcode-select --install`) and approve the license (`sudo xcodebuild -license`) before gcc will work.
+
+Finally, `giveme` uses a configuration file (written in YAML) to learn where individual tools are, and how to use them to encode/decode. You will need to copy giveme4.yaml to your home directory as follows:
+
+```bash
+cp giveme4.yaml ~/.giveme4.yaml
+```
+
 
 Features
 --------
